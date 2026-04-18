@@ -1,0 +1,165 @@
+local player = game.Players.LocalPlayer
+local cam = workspace.CurrentCamera
+local RS = game:GetService("RunService")
+local UIS = game:GetService("UserInputService")
+
+local char = player.Character or player.CharacterAdded:Wait()
+local flying = false
+local speed = 60
+
+-- GUI
+local gui = Instance.new("ScreenGui", game.CoreGui)
+
+local frame = Instance.new("Frame", gui)
+frame.Size = UDim2.new(0,140,0,100)
+frame.Position = UDim2.new(0.1,0,0.65,0)
+frame.BackgroundColor3 = Color3.fromRGB(20,20,20)
+
+-- Toggle
+local toggle = Instance.new("TextButton", frame)
+toggle.Size = UDim2.new(1,0,0.5,0)
+toggle.Text = "FLY OFF"
+toggle.BackgroundColor3 = Color3.fromRGB(30,30,30)
+toggle.TextColor3 = Color3.new(1,1,1)
+
+-- Speed
+local speedBox = Instance.new("TextBox", frame)
+speedBox.Size = UDim2.new(1,0,0.5,0)
+speedBox.Position = UDim2.new(0,0,0.5,0)
+speedBox.Text = tostring(speed)
+speedBox.BackgroundColor3 = Color3.fromRGB(40,40,40)
+speedBox.TextColor3 = Color3.new(1,1,1)
+
+-- 🔥 DRAG FIX (GLOBAL TOUCH)
+local dragging = false
+local dragStart
+local startPos
+
+UIS.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch then
+        local pos = input.Position
+        local absPos = frame.AbsolutePosition
+        local absSize = frame.AbsoluteSize
+
+        -- cek kalau touch di dalam frame
+        if pos.X >= absPos.X and pos.X <= absPos.X + absSize.X
+        and pos.Y >= absPos.Y and pos.Y <= absPos.Y + absSize.Y then
+            dragging = true
+            dragStart = pos
+            startPos = frame.Position
+        end
+    end
+end)
+
+UIS.InputChanged:Connect(function(input)
+    if dragging and input.UserInputType == Enum.UserInputType.Touch then
+        local delta = input.Position - dragStart
+
+        frame.Position = UDim2.new(
+            startPos.X.Scale,
+            startPos.X.Offset + delta.X,
+            startPos.Y.Scale,
+            startPos.Y.Offset + delta.Y
+        )
+    end
+end)
+
+UIS.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch then
+        dragging = false
+    end
+end)
+
+-- SPEED UPDATE
+speedBox.FocusLost:Connect(function()
+    local num = tonumber(speedBox.Text)
+    if num then
+        speed = math.clamp(num, 10, 300)
+        speedBox.Text = tostring(speed)
+    else
+        speedBox.Text = tostring(speed)
+    end
+end)
+
+local bv, bg
+
+local function startFly()
+    char = player.Character or player.CharacterAdded:Wait()
+    local hrp = char:WaitForChild("HumanoidRootPart")
+    local humanoid = char:WaitForChild("Humanoid")
+
+    for _, track in pairs(humanoid:GetPlayingAnimationTracks()) do
+        track:Stop()
+    end
+
+    local animate = char:FindFirstChild("Animate")
+    if animate then animate.Disabled = true end
+
+    bv = Instance.new("BodyVelocity")
+    bv.MaxForce = Vector3.new(9e9,9e9,9e9)
+    bv.Parent = hrp
+
+    bg = Instance.new("BodyGyro")
+    bg.MaxTorque = Vector3.new(9e9,9e9,9e9)
+    bg.P = 10000
+    bg.Parent = hrp
+
+    humanoid:ChangeState(Enum.HumanoidStateType.Physics)
+    humanoid:SetStateEnabled(Enum.HumanoidStateType.Freefall, false)
+    humanoid:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false)
+    humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping, false)
+
+    RS:BindToRenderStep("Fly", 0, function()
+        local moveDir = humanoid.MoveDirection
+        local camCF = cam.CFrame
+
+        local localMove = camCF:VectorToObjectSpace(moveDir)
+
+        local move =
+            (camCF.LookVector * localMove.Z) +
+            (camCF.RightVector * localMove.X)
+
+        if move.Magnitude > 0 then
+            move = move.Unit * speed
+        end
+
+        bv.Velocity = move
+        bg.CFrame = camCF
+
+        humanoid:ChangeState(Enum.HumanoidStateType.Physics)
+    end)
+end
+
+local function stopFly()
+    RS:UnbindFromRenderStep("Fly")
+
+    if bv then bv:Destroy() end
+    if bg then bg:Destroy() end
+
+    local humanoid = char:FindFirstChild("Humanoid")
+
+    if humanoid then
+        humanoid:SetStateEnabled(Enum.HumanoidStateType.Freefall, true)
+        humanoid:SetStateEnabled(Enum.HumanoidStateType.FallingDown, true)
+        humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping, true)
+
+        humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
+        task.wait(0.1)
+        humanoid:ChangeState(Enum.HumanoidStateType.Running)
+    end
+
+    local animate = char:FindFirstChild("Animate")
+    if animate then animate.Disabled = false end
+end
+
+toggle.MouseButton1Click:Connect(function()
+    flying = not flying
+
+    if flying then
+        toggle.Text = "FLY ON"
+        startFly()
+    else
+        toggle.Text = "FLY OFF"
+        stopFly()
+    end
+end)
