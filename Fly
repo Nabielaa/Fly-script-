@@ -15,6 +15,15 @@ frame.Size = UDim2.new(0,140,0,100)
 frame.Position = UDim2.new(0.1,0,0.65,0)
 frame.BackgroundColor3 = Color3.fromRGB(20,20,20)
 
+-- NOTIFIKASI
+pcall(function()
+    game:GetService("StarterGui"):SetCore("SendNotification", {
+        Title = "Fly Script",
+        Text = "made by MUZASCRIPT",
+        Duration = 5
+    })
+end)
+
 -- Toggle
 local toggle = Instance.new("TextButton", frame)
 toggle.Size = UDim2.new(1,0,0.5,0)
